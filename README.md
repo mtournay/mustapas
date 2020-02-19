@@ -27,3 +27,7 @@ be it direct string, files, sockets, whatever you can imagine.
 * inverted (&#10060;)
 * partials (&#10060;)
 * sections (&#10060;)
+
+# About this fork
+I made this fork in order to remove dependency to iostream and directly read from / write to streams
+(original version had issues when used inside a dll)
