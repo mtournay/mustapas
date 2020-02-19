@@ -46,7 +46,13 @@
       <Filename Value="spectester"/>
     </Target>
     <SearchPaths>
+      <IncludeFiles Value="$(ProjOutDir)"/>
       <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
     </SearchPaths>
+    <Linking>
+      <Debugging>
+        <DebugInfoType Value="dsDwarf2"/>
+      </Debugging>
+    </Linking>
   </CompilerOptions>
 </CONFIG>

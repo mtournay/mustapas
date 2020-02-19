@@ -24,7 +24,7 @@ procedure Render(const Template: TStream; const Context: TJSONObject; Result: TS
 implementation
 
 uses
-  StrUtils,StreamIO;
+  StrUtils;
 
 function Escape(const S: String): String;
 begin
@@ -38,7 +38,6 @@ type
     tkText,tkEscapedVariable,tkUnescapedVariable,tkOpenSection,tkCloseSection
   );
 
-  PToken = ^TToken;
   TToken = record
     Line,Col: LongWord;
     Kind: TTokenKind;
@@ -82,27 +81,10 @@ type
   );
 
 var
-  Input: Text;
   LexerState: TLexerState;
   Line,Col: LongWord; // current lexer position
-  LineBuf: String;    // line buffer, holds current line contents of the source file
 
-function ReadChar: Char; // read next character from the input stream
-begin
-  if EOF(Input) then begin
-    Result := EOFChar;
-  end else begin
-    Read(Input,Result);
-    if Result = LFChar then begin
-      Inc(Line);
-      Col := 0;
-    end else begin
-      Inc(Col);
-    end;
-  end;
-end;
-
-function Tokenize: TTokenList;
+function Tokenize(input: TStream): TTokenList;
 var
   StartLine,StartCol: LongWord;
   Kind: TTokenKind;
@@ -115,6 +97,20 @@ var
     StartLine := Line;
     StartCol := Col;
     Lexeme := EmptyStr;
+  end;
+
+  function ReadChar: Char; // read next character from the input stream
+  begin
+    if input.Position < input.Size then begin
+      result:= chr(input.ReadByte);
+      if Result = LFChar then begin
+        Inc(Line);
+        Col := 0;
+      end else begin
+        Inc(Col);
+      end;
+    end else
+      result := EOFChar;
   end;
 
   procedure HandleText;
@@ -284,7 +280,8 @@ var
 
 begin
   Initialize(Result);
-  LexerState := lsText;
+  LexerState := lsText;    
+  input.Seek(0, fsFromBeginning);
 
   InitFields;
   ContextBasePath := EmptyStr;
@@ -337,19 +334,17 @@ end;
 
 procedure Interpret(const Tokens: TTokenList; const Context: TJSONObject; Result: TStream);
 var
-  Output: Text;
   Token: TToken;
   Value,BasePath: String;
   Node: TJSONData;
   p: SizeInt;
 begin
-  AssignStream(Output,Result);
-  Rewrite(Output);
   for Token in Tokens do
     case Token.Kind of
       tkText: begin
         // WriteLn('Rendering "' + Escape(Token.Lexeme) + '"');
-        Write(Output,Token.Lexeme);
+        Result.WriteBuffer(Token.Lexeme[1], length(Token.Lexeme));
+
       end;
       tkEscapedVariable,tkUnescapedVariable: begin
         Value := '';
@@ -378,8 +373,9 @@ begin
             jtNull: ;
             jtArray: raise Exception.Create('Can''t interpolate array directly');
             jtObject: raise Exception.Create('Can''t interpolate object directly');
-          end;
-        Write(Output,Value);
+          end;                      
+        Result.WriteBuffer(Value[1], length(Value));
+        //Write(Output,Value);
       end;
     end;
 end;
@@ -387,15 +383,12 @@ end;
 procedure Render(const Template: TStream; const Context: TJSONObject; Result: TStream);
 var
   Tokens: TTokenList;
-  Token: TToken;
 begin
   if not Assigned(OnGetCache) or not OnGetCache(Template,Context,Result) then begin
-    // initialize input and lexer
-    AssignStream(Input,Template);
-    Reset(Input);
+    // initialize lexer
     Line := 1;
     Col := 0;
-    Tokens := Tokenize;
+    Tokens := Tokenize(template);
     Interpret(Tokens,Context,Result);
     if Assigned(OnPutCache) then OnPutCache(Template,Context,Result);
   end;
