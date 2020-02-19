@@ -1,3 +1,5 @@
 *.o
 *.ppu
-spectester
+spectester.*
+backup/
+lib/
